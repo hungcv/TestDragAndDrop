@@ -6,4 +6,6 @@ package com.example.user.testdraganddrop;
 public class AppConstant {
 
     public static final int CELL_SIZE = (int) (180 * (float) 1080 / 1536);
+    public static final int MIN_X_2_SWIPE = CELL_SIZE / 5;
+    public static final int MAX_X_2_SWIPE = ScreenHelper.getScreenWidthInPx() - CELL_SIZE / 5;
 }

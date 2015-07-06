@@ -12,6 +12,15 @@ public class ItemGrid implements Parcelable {
 
     public String text;
 
+    @Override
+    public String toString() {
+        return "ItemGrid{" +
+                "id=" + id +
+                ", text='" + text + '\'' +
+                ", icon=" + icon +
+                '}';
+    }
+
     public int icon;
 
     public ItemGrid(int id, String text, int icon) {

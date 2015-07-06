@@ -12,12 +12,16 @@ import java.util.List;
  */
 public class TabBarAdapter extends RecyclerView.Adapter<ItemViewHolder> {
 
-//    private final static String TAG = "TabBarAdapter";
+    //    private final static String TAG = "TabBarAdapter";
+    public static final int CELL_SIZE = AppConstant.CELL_SIZE + 2 * ScreenHelper.dpToPx(10);
+    public static final int CELL_MAX_Y = CELL_SIZE - ScreenHelper.dpToPx(10);
+    public static final int CELL_MIN_Y = ScreenHelper.dpToPx(10);
 
     private List<ItemGrid> list;
 
     @NonNull
     private OnDragItem onDragItem;
+
 
     public TabBarAdapter(List<ItemGrid> list, @NonNull OnDragItem onDragItem) {
         this.list = list;
@@ -35,20 +39,15 @@ public class TabBarAdapter extends RecyclerView.Adapter<ItemViewHolder> {
         return count < list.size();
     }
 
-//    public void swapIndex(int oldIndex, int newIndex) {
-//        if (oldIndex < newIndex) {
-//            for (int i = oldIndex; i < newIndex; i++) {
-//                Collections.swap(list, i, i + 1);
-//                translateToLeftIds.add(String.valueOf(i));
-//            }
-//        } else {
-//            for (int i = oldIndex; i > newIndex; i--) {
-//                Collections.swap(list, i, i - 1);
-//                translateToRightIds.add(String.valueOf(i));
-//            }
-//        }
-//        notifyDataSetChanged();
-//    }
+    public int getIndexByCoordinate(float x) {
+        int count = list.size();
+        for (int i = count - 1; i >= 0; i--) {
+            if (x > (i) * CELL_SIZE) {
+                return i;
+            }
+        }
+        return 0;
+    }
 
     @Override
     public ItemViewHolder onCreateViewHolder(ViewGroup viewGroup, int i) {

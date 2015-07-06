@@ -7,12 +7,14 @@ import android.support.v4.app.Fragment;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.Animation;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -26,8 +28,7 @@ public class HomeItemFragment extends Fragment {
     private static final String TAG = "HomeItemFragment";
 
     private List<ItemGrid> itemGridList;
-    private List<ItemGrid> draggingLtemList;
-    private int page;
+    public List<ItemGrid> draggingItemList;
     private RecyclerView recyclerView;
     public GridAdapter gridAdapter;
     public int draggingPosition = -1;
@@ -73,19 +74,26 @@ public class HomeItemFragment extends Fragment {
     private OnDragItem onDragItem = new OnDragItem() {
         @Override
         public void onStartDrag(ItemViewHolder holder, int position) {
-            startDragPosition = position;
-            draggingPosition = position;
-            ClipData data = ClipData.newPlainText("", "");
-            View.DragShadowBuilder shadowBuilder = new View.DragShadowBuilder(holder.image);
-            DragObject object = new DragObject(DragObject.From.GRID_VIEW, itemGridList.get(position), position);
-            holder.image.startDrag(data, shadowBuilder, object, 0);
-            holder.itemView.setVisibility(View.INVISIBLE);
-            startMoveAnimation();
+            ItemGrid itemGrid = itemGridList.get(position);
+            if (itemGrid.id > 0) {
+                startDragPosition = position;
+                draggingPosition = position;
+                ClipData data = ClipData.newPlainText("", "");
+                View.DragShadowBuilder shadowBuilder = new View.DragShadowBuilder(holder.image);
+                DragObject object = new DragObject(DragObject.From.GRID_VIEW, itemGrid, position);
+                holder.image.startDrag(data, shadowBuilder, object, 0);
+                holder.itemView.setVisibility(View.INVISIBLE);
+                startMoveAnimation();
+            }
         }
     };
 
+    public void setMoveAnimation(RecyclerView.ItemAnimator itemAnimator) {
+        recyclerView.setItemAnimator(itemAnimator);
+    }
+
     public void startMoveAnimation() {
-        draggingLtemList = new ArrayList<>(itemGridList);
+        draggingItemList = new ArrayList<>(itemGridList);
         final Animation rotate = AnimationHelper.createFastRotateAnimation();
         int size = itemGridList.size();
         for (int i = 0; i < size; i++) {
@@ -102,33 +110,46 @@ public class HomeItemFragment extends Fragment {
     public void stopAnimation() {
         int size = itemGridList.size();
         for (int i = 0; i < size; i++) {
-            getViewHolderByPosition(i).itemView.clearAnimation();
+            ItemViewHolder holder = getViewHolderByPosition(i);
+            if (holder != null) {
+                holder.itemView.clearAnimation();
+            }
         }
     }
 
-    public void deleteDragItem() {
-        draggingLtemList.clear();
-        itemGridList.remove(startDragPosition);
-        itemGridList.add(startDragPosition, new ItemGrid(0, null, 0));
+    public void deleteDragItemAndStop() {
+        ItemGrid itemGrid = itemGridList.get(startDragPosition);
+        int index = draggingItemList.indexOf(itemGrid);
+        draggingItemList.remove(index);
+        draggingItemList.add(index, new ItemGrid(0, null, 0));
         hasEmptyCell = true;
-        gridAdapter.notifyDataSetChanged();
+        stopDragAndDrop(true);
     }
 
     public void insertItem(int position, ItemGrid item) {
-        draggingLtemList.clear();
-        itemGridList.remove(position);
-        itemGridList.add(position, item);
-        gridAdapter.notifyDataSetChanged();
+        draggingItemList.remove(position);
+        draggingItemList.add(position, item);
+        stopDragAndDrop(true);
         checkHasEmptyCell();
     }
 
-    public void holdOnPosition() {
-        if (draggingLtemList.get(draggingPosition).id == 0) {
-
-        } else {
-
-        }
+    public void swapCell(int oldPosition, int newPosition) {
+        Log.e(TAG, "swap(" + oldPosition + "," + newPosition + ")");
+        Collections.swap(draggingItemList, oldPosition, newPosition);
+        gridAdapter.notifyItemMoved(oldPosition, newPosition);
     }
 
+    public void stopDragAndDrop(boolean changed) {
+        if (draggingPosition >= 0) {
+            stopAnimation();
+            draggingPosition = -1;
+            startDragPosition = -1;
+            if (changed) {
+                itemGridList.clear();
+                itemGridList.addAll(draggingItemList);
+            }
+            gridAdapter.notifyDataSetChanged();
+        }
+    }
 
 }

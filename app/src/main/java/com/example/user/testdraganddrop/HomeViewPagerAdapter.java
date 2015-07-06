@@ -26,7 +26,7 @@ public class HomeViewPagerAdapter extends FragmentStatePagerAdapter {
         data.add(new ItemGrid(3, "Item 3", R.drawable.ic_temp3));
         data.add(new ItemGrid(4, "Item 4", R.drawable.ic_temp4));
         for (int i = data.size(); i < 20; i++) {
-            data.add(new ItemGrid(0, null, 0));
+            data.add(new ItemGrid(i + 1, "" + (i + 1), R.drawable.ic_temp2));
         }
     }
 
@@ -37,6 +37,6 @@ public class HomeViewPagerAdapter extends FragmentStatePagerAdapter {
 
     @Override
     public int getCount() {
-        return 1;
+        return 2;
     }
 }

@@ -30,7 +30,6 @@ public class MainActivity extends ActionBarActivity {
     private LinearLayoutManager tabLayoutManager;
     private View footer;
     private TabBarAdapter tabBarAdapter;
-    private int itemTabSize = AppConstant.CELL_SIZE + 2 * ScreenHelper.dpToPx(10);
     private List<ItemGrid> itemTabList;
     private List<ItemGrid> draggingList;
     private int startDragTabPosition = -1;
@@ -39,8 +38,8 @@ public class MainActivity extends ActionBarActivity {
     private int gridCellHeight;
     private int gridCellWidth;
     private boolean isPortrait;
-
-    HomeItemFragment currentFragment;
+    private long previousTimeOnPosition;
+    private HomeItemFragment currentFragment;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -79,8 +78,8 @@ public class MainActivity extends ActionBarActivity {
 
     void initBottomBar() {
         rvTabBar = (RecyclerView) findViewById(R.id.rv_tab_bar);
-        rvTabBar.getLayoutParams().height = itemTabSize;
-        rvTabBar.getLayoutParams().width = 4 * itemTabSize;
+        rvTabBar.getLayoutParams().height = tabBarAdapter.CELL_SIZE;
+        rvTabBar.getLayoutParams().width = 4 * tabBarAdapter.CELL_SIZE;
         rvTabBar.invalidate();
         rvTabBar.setHasFixedSize(true);
         itemTabList = new ArrayList<>();
@@ -98,15 +97,18 @@ public class MainActivity extends ActionBarActivity {
     private OnDragItem onDragItemTabBar = new OnDragItem() {
         @Override
         public void onStartDrag(ItemViewHolder holder, int position) {
-            previousTimeOnPosition = System.currentTimeMillis();
-            draggingPosition = position;
-            startDragTabPosition = position;
-            ClipData data = ClipData.newPlainText("", "");
-            View.DragShadowBuilder shadowBuilder = new View.DragShadowBuilder(holder.image);
-            DragObject object = new DragObject(DragObject.From.TAB_BAR, itemTabList.get(position), position);
-            holder.image.startDrag(data, shadowBuilder, object, 0);
-            holder.itemView.setVisibility(View.INVISIBLE);
-            startRotateAnimation();
+            ItemGrid itemGrid = itemTabList.get(position);
+            if (itemGrid.id > 0) {
+                previousTimeOnPosition = System.currentTimeMillis();
+                draggingPosition = position;
+                startDragTabPosition = position;
+                ClipData data = ClipData.newPlainText("", "");
+                View.DragShadowBuilder shadowBuilder = new View.DragShadowBuilder(holder.image);
+                DragObject object = new DragObject(DragObject.From.TAB_BAR, itemGrid, position);
+                holder.image.startDrag(data, shadowBuilder, object, 0);
+                holder.itemView.setVisibility(View.INVISIBLE);
+                startRotateAnimation();
+            }
         }
     };
 
@@ -124,9 +126,7 @@ public class MainActivity extends ActionBarActivity {
         return (ItemViewHolder) rvTabBar.findViewHolderForAdapterPosition(position);
     }
 
-    private long previousTimeOnPosition;
-    private int tabMinY = ScreenHelper.dpToPx(10);
-    private int tabMaxY = itemTabSize - ScreenHelper.dpToPx(10);
+    private long previousTimeOnSwipe;
 
     private View.OnDragListener onDragListener = new View.OnDragListener() {
         @Override
@@ -135,12 +135,13 @@ public class MainActivity extends ActionBarActivity {
             switch (event.getAction()) {
                 case DragEvent.ACTION_DRAG_STARTED:
                     if (v.getId() == R.id.rv_tab_bar) {
-                        startRotateAnimation();
                         currentFragment = getCurrentFragment();
                         currentFragment.startMoveAnimation();
+                        startRotateAnimation();
                     }
                     break;
                 case DragEvent.ACTION_DRAG_LOCATION:
+                    Log.e(TAG, "X:" + event.getX());
                     if (dragObject.from == DragObject.From.TAB_BAR) {
                         if (v.getId() == R.id.rv_tab_bar) {
                             handleMoveWithinTab(event);
@@ -151,38 +152,62 @@ public class MainActivity extends ActionBarActivity {
                         if (v.getId() == R.id.rv_tab_bar) {
                             handleMoveGrid2Tab(dragObject, event);
                         } else {
-
+                            handleMoveWithinGrid(dragObject, event);
                         }
+                    }
+
+                    if (event.getX() > AppConstant.MAX_X_2_SWIPE) {
+                        long now = System.currentTimeMillis();
+                        if (previousTimeOnSwipe == 0) {
+                            previousTimeOnSwipe = now;
+                        }
+                        if (now - previousTimeOnSwipe > 1000) {
+                            Log.e(TAG, "SWIPE RIGHT");
+                            doSwipeToRight();
+                            previousTimeOnSwipe = 0;
+                            return false;
+                        }
+                    } else if (event.getX() < AppConstant.MIN_X_2_SWIPE) {
+                        long now = System.currentTimeMillis();
+                        if (previousTimeOnSwipe == 0) {
+                            previousTimeOnSwipe = now;
+                        }
+                        if (now - previousTimeOnSwipe > 1000) {
+                            Log.e(TAG, "SWIPE LEFT");
+                            doSwipeToLeft();
+                            previousTimeOnSwipe = 0;
+                            return false;
+                        }
+                    } else {
+                        previousTimeOnSwipe = 0;
                     }
                     break;
                 case DragEvent.ACTION_DRAG_ENDED:
-                    tabBarAdapter.notifyDataSetChanged();
-                    currentFragment.gridAdapter.notifyDataSetChanged();
+                    stopDragAndDrop(false);
+                    currentFragment.stopDragAndDrop(false);
                     break;
                 case DragEvent.ACTION_DROP:
-                    Log.e(TAG, "ACTION_DROP X:" + event.getX());
-                    currentFragment.stopAnimation();
-                    stopTabAnimation();
                     if (v.getId() == R.id.rv_tab_bar) {
                         if (dragObject.from == DragObject.From.TAB_BAR) {
-                            itemTabList.clear();
-                            itemTabList.addAll(draggingList);
-                            tabBarAdapter.notifyDataSetChanged();
+                            stopDragAndDrop(true);
                         } else {
                             if (draggingList.get(draggingPosition).id == 0) {
-                                //do add new item to TabBar and remove this item from Grid
+                                //Move item from Grid to Tab
                                 insertItem2Tab(draggingPosition, dragObject.itemGrid);
-                                currentFragment.deleteDragItem();
+                                currentFragment.deleteDragItemAndStop();
                             }
                         }
                     } else {
                         if (dragObject.from == DragObject.From.TAB_BAR) {
+                            // move item from TAB to Grid
                             currentFragment.insertItem(currentFragment.draggingPosition, dragObject.itemGrid);
-                            deleteDragItem();
+                            removeDragItemAndStop();
                         } else {
+                            currentFragment.stopDragAndDrop(true);
                         }
-
                     }
+                    currentFragment.stopAnimation();
+                    stopTabAnimation();
                     break;
                 default:
                     break;
@@ -191,22 +216,33 @@ public class MainActivity extends ActionBarActivity {
         }
     };
 
-    void deleteDragItem() {
-        itemTabList.remove(startDragTabPosition);
-        itemTabList.add(startDragTabPosition, new ItemGrid(0, null, 0));
-        tabBarAdapter.notifyDataSetChanged();
+    void doSwipeToRight() {
+        if (viewPager.getCurrentItem() < adapter.getCount() - 1) {
+            viewPager.setCurrentItem(viewPager.getCurrentItem() + 1, true);
+        }
+    }
+
+    void doSwipeToLeft() {
+        if (viewPager.getCurrentItem() > 0) {
+            viewPager.setCurrentItem(viewPager.getCurrentItem() - 1, true);
+        }
+    }
+
+    void removeDragItemAndStop() {
+        ItemGrid itemGrid = itemTabList.get(startDragTabPosition);
+        int index = draggingList.indexOf(itemGrid);
+        draggingList.remove(index);
+        draggingList.add(index, new ItemGrid(0, null, 0));
+        stopDragAndDrop(true);
     }
 
     void stopTabAnimation() {
         for (int i = 0; i < 4; i++) {
-            rvTabBar.findViewHolderForAdapterPosition(i).itemView.clearAnimation();
+            RecyclerView.ViewHolder holder = rvTabBar.findViewHolderForAdapterPosition(i);
+            if (holder != null) {
+                holder.itemView.clearAnimation();
+            }
         }
-    }
-
-    void startMoveAndRotateAnimation(int position, boolean toRight) {
-        RecyclerView.ViewHolder holder = rvTabBar.findViewHolderForAdapterPosition(position);
-        holder.itemView.clearAnimation();
-        holder.itemView.startAnimation(AnimationHelper.createSlideAndRotate(toRight));
     }
 
     HomeItemFragment getCurrentFragment() {
@@ -220,8 +256,26 @@ public class MainActivity extends ActionBarActivity {
 
     void handleMoveTab2Grid(DragEvent event) {
         if (currentFragment.hasEmptyCell) {
+            int oldPosition = currentFragment.draggingPosition;
             currentFragment.draggingPosition = findCellIndexInGrid(event.getX(), event.getY());
-            currentFragment.holdOnPosition();
+            if (oldPosition < 0) {
+                return;
+            }
+            if (validHoldTime(oldPosition, currentFragment.draggingPosition)) {
+                if (oldPosition < currentFragment.draggingPosition) {
+                    currentFragment.setMoveAnimation(new SlideInLeftAnimator());
+                    for (int i = oldPosition; i < currentFragment.draggingPosition; i++) {
+                        currentFragment.swapCell(i, i + 1);
+                    }
+                } else {
+                    currentFragment.setMoveAnimation(new SlideInRightAnimator());
+                    for (int i = oldPosition; i > currentFragment.draggingPosition; i--) {
+                        currentFragment.swapCell(i, i - 1);
+                    }
+                }
+            } else {
+                currentFragment.draggingPosition = oldPosition;
+            }
         }
     }
 
@@ -238,15 +292,15 @@ public class MainActivity extends ActionBarActivity {
             rowCount = 2;
             columnCount = 6;
         }
-        for (int i = columnCount; i > 0; i--) {
-            if (x > (i - 1) * gridCellWidth) {
-                column = i - 1;
+        for (int i = columnCount - 1; i >= 0; i--) {
+            if (x > (i) * gridCellWidth) {
+                column = i;
                 break;
             }
         }
-        for (int i = rowCount; i > 0; i--) {
-            if (y > (i - 1) * gridCellHeight) {
-                row = i - 1;
+        for (int i = rowCount - 1; i >= 0; i--) {
+            if (y > (i) * gridCellHeight) {
+                row = i;
                 break;
             }
         }
@@ -257,16 +311,8 @@ public class MainActivity extends ActionBarActivity {
     }
 
     void handleMoveGrid2Tab(DragObject object, DragEvent event) {
+        draggingPosition = tabBarAdapter.getIndexByCoordinate(event.getX());
         if (tabBarAdapter.hasEmptyCell()) {
-            if (event.getX() > 3 * itemTabSize) {
-                draggingPosition = 3;
-            } else if (event.getX() > 2 * itemTabSize) {
-                draggingPosition = 2;
-            } else if (event.getX() > itemTabSize) {
-                draggingPosition = 1;
-            } else if (event.getX() > 0) {
-                draggingPosition = 0;
-            }
             if (itemTabList.get(draggingPosition).id == 0) {
 
             } else {
@@ -276,14 +322,40 @@ public class MainActivity extends ActionBarActivity {
     }
 
     void insertItem2Tab(int position, ItemGrid itemGrid) {
-        itemTabList.remove(position);
-        itemTabList.add(position, itemGrid);
-        tabBarAdapter.notifyDataSetChanged();
+        draggingList.remove(position);
+        draggingList.add(position, itemGrid);
+        stopDragAndDrop(true);
     }
 
 
     void handleMoveWithinGrid(DragObject object, DragEvent event) {
-
+        int oldPosition = currentFragment.draggingPosition;
+        currentFragment.draggingPosition = findCellIndexInGrid(event.getX(), event.getY());
+        if (validHoldTime(oldPosition, currentFragment.draggingPosition)) {
+            ItemGrid holdOnItem = currentFragment.draggingItemList.get(currentFragment.draggingPosition);
+            Log.e(TAG, "" + holdOnItem.toString());
+            if (oldPosition < currentFragment.draggingPosition) {
+                currentFragment.setMoveAnimation(new SlideInLeftAnimator());
+                if (holdOnItem.id > 0) {
+                    for (int i = oldPosition; i < currentFragment.draggingPosition; i++) {
+                        currentFragment.swapCell(i, i + 1);
+                    }
+                } else {
+                    currentFragment.swapCell(oldPosition, currentFragment.draggingPosition);
+                }
+            } else {
+                currentFragment.setMoveAnimation(new SlideInRightAnimator());
+                if (holdOnItem.id > 0) {
+                    for (int i = oldPosition; i > currentFragment.draggingPosition; i--) {
+                        currentFragment.swapCell(i, i - 1);
+                    }
+                } else {
+                    currentFragment.swapCell(oldPosition, currentFragment.draggingPosition);
+                }
+            }
+        } else {
+            currentFragment.draggingPosition = oldPosition;
+        }
     }
 
     boolean validHoldTime(int oldIndex, int newIndex) {
@@ -292,7 +364,7 @@ public class MainActivity extends ActionBarActivity {
                 previousTimeOnPosition = System.currentTimeMillis();
             } else {
                 long now = System.currentTimeMillis();
-                if (now - previousTimeOnPosition > 300) {
+                if (now - previousTimeOnPosition > 500) {
                     previousTimeOnPosition = now;
                     return true;
                 }
@@ -304,37 +376,55 @@ public class MainActivity extends ActionBarActivity {
     }
 
     void handleMoveWithinTab(DragEvent event) {
-        if (event.getY() < tabMinY || event.getY() > tabMaxY) {
+        if (event.getY() < tabBarAdapter.CELL_MIN_Y || event.getY() > tabBarAdapter.CELL_MAX_Y) {
             return;
         }
         int oldPosition = draggingPosition;
-        if (event.getX() > 3 * itemTabSize) {
-            draggingPosition = 3;
-        } else if (event.getX() > 2 * itemTabSize) {
-            draggingPosition = 2;
-        } else if (event.getX() > itemTabSize) {
-            draggingPosition = 1;
-        } else if (event.getX() > 0) {
-            draggingPosition = 0;
-        }
+        draggingPosition = tabBarAdapter.getIndexByCoordinate(event.getX());
         if (validHoldTime(oldPosition, draggingPosition)) {
-            getViewHolderByPosition(oldPosition).itemView.setVisibility(View.INVISIBLE);
             Log.e(TAG, "swap(" + oldPosition + "," + draggingPosition + ")");
             if (oldPosition < draggingPosition) {
                 rvTabBar.setItemAnimator(new SlideInLeftAnimator());
-                for (int i = oldPosition; i < draggingPosition; i++) {
-                    Collections.swap(draggingList, i, i + 1);
-                    tabBarAdapter.notifyItemMoved(i, i + 1);
+                if (draggingList.get(startDragTabPosition).id > 0) {
+                    for (int i = oldPosition; i < draggingPosition; i++) {
+                        Collections.swap(draggingList, i, i + 1);
+                        tabBarAdapter.notifyItemMoved(i, i + 1);
+                    }
+                } else {
+                    Collections.swap(draggingList, oldPosition, draggingPosition);
+                    tabBarAdapter.notifyItemMoved(oldPosition, draggingPosition);
                 }
             } else {
                 rvTabBar.setItemAnimator(new SlideInRightAnimator());
-                for (int i = oldPosition; i > draggingPosition; i--) {
-                    Collections.swap(draggingList, i, i - 1);
-                    tabBarAdapter.notifyItemMoved(i, i - 1);
+                if (draggingList.get(startDragTabPosition).id > 0) {
+                    for (int i = oldPosition; i > draggingPosition; i--) {
+                        Collections.swap(draggingList, i, i - 1);
+                        tabBarAdapter.notifyItemMoved(i, i - 1);
+                    }
+                } else {
+                    Collections.swap(draggingList, oldPosition, draggingPosition);
+                    tabBarAdapter.notifyItemMoved(oldPosition, draggingPosition);
                 }
             }
         } else {
             draggingPosition = oldPosition;
         }
     }
+
+    public void stopDragAndDrop(boolean changed) {
+        if (draggingPosition >= 0) {
+            draggingPosition = -1;
+            startDragTabPosition = -1;
+            stopTabAnimation();
+            if (changed) {
+                itemTabList.clear();
+                itemTabList.addAll(draggingList);
+            }
+            tabBarAdapter.notifyDataSetChanged();
+        }
+
+
+    }
+
+
 }
