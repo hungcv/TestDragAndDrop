@@ -79,7 +79,7 @@ public class HomeItemFragment extends Fragment {
             View.DragShadowBuilder shadowBuilder = new View.DragShadowBuilder(holder.image);
             DragObject object = new DragObject(DragObject.From.GRID_VIEW, itemGridList.get(position), position);
             holder.image.startDrag(data, shadowBuilder, object, 0);
-            holder.showFrame(true);
+            holder.itemView.setVisibility(View.INVISIBLE);
             startMoveAnimation();
         }
     };
@@ -124,7 +124,7 @@ public class HomeItemFragment extends Fragment {
 
     public void holdOnPosition() {
         if (draggingLtemList.get(draggingPosition).id == 0) {
-            getViewHolderByPosition(draggingPosition).showFrame(true);
+
         } else {
 
         }

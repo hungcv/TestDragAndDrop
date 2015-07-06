@@ -17,6 +17,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import jp.wasabeef.recyclerview.animators.SlideInLeftAnimator;
+import jp.wasabeef.recyclerview.animators.SlideInRightAnimator;
+
 
 public class MainActivity extends ActionBarActivity {
 
@@ -102,7 +105,7 @@ public class MainActivity extends ActionBarActivity {
             View.DragShadowBuilder shadowBuilder = new View.DragShadowBuilder(holder.image);
             DragObject object = new DragObject(DragObject.From.TAB_BAR, itemTabList.get(position), position);
             holder.image.startDrag(data, shadowBuilder, object, 0);
-            holder.showFrame(true);
+            holder.itemView.setVisibility(View.INVISIBLE);
             startRotateAnimation();
         }
     };
@@ -265,15 +268,11 @@ public class MainActivity extends ActionBarActivity {
                 draggingPosition = 0;
             }
             if (itemTabList.get(draggingPosition).id == 0) {
-                showFrameOnTab();
+
             } else {
 //                TODO: sortItem
             }
         }
-    }
-
-    void showFrameOnTab() {
-        getViewHolderByPosition(draggingPosition).showFrame(true);
     }
 
     void insertItem2Tab(int position, ItemGrid itemGrid) {
@@ -318,24 +317,20 @@ public class MainActivity extends ActionBarActivity {
         } else if (event.getX() > 0) {
             draggingPosition = 0;
         }
-        if (draggingList.get(draggingPosition).id == 0) {
-            getViewHolderByPosition(draggingPosition).showFrame(true);
-        }
         if (validHoldTime(oldPosition, draggingPosition)) {
+            getViewHolderByPosition(oldPosition).itemView.setVisibility(View.INVISIBLE);
             Log.e(TAG, "swap(" + oldPosition + "," + draggingPosition + ")");
             if (oldPosition < draggingPosition) {
+                rvTabBar.setItemAnimator(new SlideInLeftAnimator());
                 for (int i = oldPosition; i < draggingPosition; i++) {
                     Collections.swap(draggingList, i, i + 1);
-                    tabLayoutManager.moveView(i, i + 1);
-//                    tabBarAdapter.notifyItemMoved(i, i + 1);
-//                    startMoveAndRotateAnimation(i, false);
+                    tabBarAdapter.notifyItemMoved(i, i + 1);
                 }
             } else {
+                rvTabBar.setItemAnimator(new SlideInRightAnimator());
                 for (int i = oldPosition; i > draggingPosition; i--) {
                     Collections.swap(draggingList, i, i - 1);
-                    tabLayoutManager.moveView(i, i - 1);
-//                    tabBarAdapter.notifyItemMoved(i, i - 1);
-//                    startMoveAndRotateAnimation(i, true);
+                    tabBarAdapter.notifyItemMoved(i, i - 1);
                 }
             }
         } else {

@@ -5,12 +5,6 @@
     android:padding="10dp"
     android:layout_height="match_parent">
 
-    <View
-        android:id="@+id/frame_view"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:background="@drawable/empty_cell_drag" />
-
     <ImageView
         android:id="@+id/img"
         android:layout_width="wrap_content"
