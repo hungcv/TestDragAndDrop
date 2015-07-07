@@ -17,6 +17,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import jp.wasabeef.recyclerview.animators.SlideInLeftAnimator;
+import jp.wasabeef.recyclerview.animators.SlideInRightAnimator;
+
 /**
  * Created by User on 7/5/2015.
  */
@@ -50,6 +53,7 @@ public class HomeItemFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         itemGridList = getArguments().getParcelableArrayList(KEY_ITEMS);
         checkHasEmptyCell();
+        Log.e(TAG, "hasEmptyCell: " + hasEmptyCell);
         int cellWidth = getArguments().getInt(KEY_CELL_WIDTH);
         int cellHeight = getArguments().getInt(KEY_CELL_HEIGHT);
         View rootView = inflater.inflate(R.layout.fragment_item_layout, container, false);
@@ -69,6 +73,7 @@ public class HomeItemFragment extends Fragment {
             }
         }
         hasEmptyCell = false;
+
     }
 
     private OnDragItem onDragItem = new OnDragItem() {
@@ -120,10 +125,31 @@ public class HomeItemFragment extends Fragment {
     public void deleteDragItemAndStop() {
         ItemGrid itemGrid = itemGridList.get(startDragPosition);
         int index = draggingItemList.indexOf(itemGrid);
+
         draggingItemList.remove(index);
         draggingItemList.add(index, new ItemGrid(0, null, 0));
+
+        int size = draggingItemList.size();
+        boolean hasAnimation = false;
+        for (int i = startDragPosition; i < size - 1; i++) {
+            recyclerView.setItemAnimator(new SlideInRightAnimator());
+            if (draggingItemList.get(i + 1).id == 0) {
+                break;
+            }
+            swapAndAnimation(i, i + 1);
+            hasAnimation = true;
+        }
         hasEmptyCell = true;
-        stopDragAndDrop(true);
+        if (hasAnimation) {
+            recyclerView.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    stopDragAndDrop(true);
+                }
+            }, 300);
+        } else {
+            stopDragAndDrop(true);
+        }
     }
 
     public void insertItem(int position, ItemGrid item) {
@@ -133,10 +159,62 @@ public class HomeItemFragment extends Fragment {
         checkHasEmptyCell();
     }
 
-    public void swapCell(int oldPosition, int newPosition) {
+    public void holdOnToInsert(int oldPosition) {
+        ItemGrid itemGrid = draggingItemList.get(draggingPosition);
+        Log.e(TAG, "" + itemGrid.toString());
+        int size = draggingItemList.size();
+        if (oldPosition >= 0 && draggingItemList.get(oldPosition).id == 0) {
+            if (oldPosition > draggingPosition) {
+                for (int i = oldPosition; i > draggingPosition; i--) {
+                    swapAndAnimation(i, i - 1);
+                }
+            } else {
+                for (int i = oldPosition; i < draggingPosition; i++) {
+                    swapAndAnimation(i, i + 1);
+                }
+            }
+        } else {
+            if (itemGrid.id > 0) {
+                for (int i = size - 1; i > draggingPosition; i--) {
+                    swapAndAnimation(i, i - 1);
+                }
+            }
+        }
+    }
+
+
+    public void swapDraftCell(int oldPosition, int newPosition) {
         Log.e(TAG, "swap(" + oldPosition + "," + newPosition + ")");
-        Collections.swap(draggingItemList, oldPosition, newPosition);
-        gridAdapter.notifyItemMoved(oldPosition, newPosition);
+        ItemGrid holdOnItem = draggingItemList.get(newPosition);
+        if (oldPosition < newPosition) {
+            recyclerView.setItemAnimator(new SlideInLeftAnimator());
+            for (int i = oldPosition; i < newPosition; i++) {
+                swapAndAnimation(i, i + 1);
+            }
+            if (holdOnItem.id == 0) {
+                for (int i = oldPosition; i < newPosition; i++) {
+                    if (draggingItemList.get(i).id == 0) {
+                        swapAndAnimation(i, newPosition);
+                        break;
+                    }
+                }
+            }
+        } else {
+            recyclerView.setItemAnimator(new SlideInRightAnimator());
+            if (holdOnItem.id > 0) {/*Case switch to left item (replace)*/
+                for (int i = oldPosition; i > newPosition; i--) {
+                    swapAndAnimation(i, i - 1);
+                }
+            } else {
+                swapAndAnimation(oldPosition, newPosition);
+            }
+        }
+    }
+
+    private void swapAndAnimation(int index1, int index2) {
+        Log.e(TAG, "swap(" + index1 + "," + index2 + ")");
+        Collections.swap(draggingItemList, index1, index2);
+        gridAdapter.notifyItemMoved(index1, index2);
     }
 
     public void stopDragAndDrop(boolean changed) {

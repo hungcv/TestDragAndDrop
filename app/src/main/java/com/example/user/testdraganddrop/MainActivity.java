@@ -3,6 +3,7 @@ package com.example.user.testdraganddrop;
 import android.content.ClipData;
 import android.content.res.Configuration;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.v4.view.ViewPager;
 import android.support.v7.app.ActionBarActivity;
 import android.support.v7.widget.LinearLayoutManager;
@@ -141,7 +142,6 @@ public class MainActivity extends ActionBarActivity {
                     }
                     break;
                 case DragEvent.ACTION_DRAG_LOCATION:
-                    Log.e(TAG, "X:" + event.getX());
                     if (dragObject.from == DragObject.From.TAB_BAR) {
                         if (v.getId() == R.id.rv_tab_bar) {
                             handleMoveWithinTab(event);
@@ -183,25 +183,18 @@ public class MainActivity extends ActionBarActivity {
                     }
                     break;
                 case DragEvent.ACTION_DRAG_ENDED:
-                    stopDragAndDrop(false);
-                    currentFragment.stopDragAndDrop(false);
+                    candidateStopDrag();
                     break;
                 case DragEvent.ACTION_DROP:
                     if (v.getId() == R.id.rv_tab_bar) {
                         if (dragObject.from == DragObject.From.TAB_BAR) {
                             stopDragAndDrop(true);
                         } else {
-                            if (draggingList.get(draggingPosition).id == 0) {
-                                //Move item from Grid to Tab
-                                insertItem2Tab(draggingPosition, dragObject.itemGrid);
-                                currentFragment.deleteDragItemAndStop();
-                            }
+                            dragGrid2Tab(event, dragObject);
                         }
                     } else {
                         if (dragObject.from == DragObject.From.TAB_BAR) {
-                            // move item from TAB to Grid
-                            currentFragment.insertItem(currentFragment.draggingPosition, dragObject.itemGrid);
-                            removeDragItemAndStop();
+                            dragTab2Grid(event, dragObject);
                         } else {
                             currentFragment.stopDragAndDrop(true);
                         }
@@ -215,6 +208,33 @@ public class MainActivity extends ActionBarActivity {
             return true;
         }
     };
+
+    void dragTab2Grid(DragEvent event, DragObject dragObject) {
+        // move item from TAB to Grid
+        currentFragment.draggingPosition = currentFragment.draggingPosition >= 0 ? currentFragment.draggingPosition : findCellIndexInGrid(event.getX(), event.getY());
+        if (currentFragment.draggingItemList.get(currentFragment.draggingPosition).id == 0) {
+            currentFragment.insertItem(currentFragment.draggingPosition, dragObject.itemGrid);
+            removeDragItemAndStop();
+        }
+    }
+
+    void dragGrid2Tab(DragEvent event, DragObject dragObject) {
+        draggingPosition = draggingPosition >= 0 ? draggingPosition : tabBarAdapter.getIndexByCoordinate(event.getX());
+        if (draggingList.get(draggingPosition).id == 0) {
+            insertItem2Tab(draggingPosition, dragObject.itemGrid);
+            currentFragment.deleteDragItemAndStop();
+        }
+    }
+
+    void candidateStopDrag() {
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                stopDragAndDrop(false);
+                currentFragment.stopDragAndDrop(false);
+            }
+        }, 300);
+    }
 
     void doSwipeToRight() {
         if (viewPager.getCurrentItem() < adapter.getCount() - 1) {
@@ -253,31 +273,6 @@ public class MainActivity extends ActionBarActivity {
         return (HomeItemFragment) adapter.instantiateItem(viewPager, position);
     }
 
-
-    void handleMoveTab2Grid(DragEvent event) {
-        if (currentFragment.hasEmptyCell) {
-            int oldPosition = currentFragment.draggingPosition;
-            currentFragment.draggingPosition = findCellIndexInGrid(event.getX(), event.getY());
-            if (oldPosition < 0) {
-                return;
-            }
-            if (validHoldTime(oldPosition, currentFragment.draggingPosition)) {
-                if (oldPosition < currentFragment.draggingPosition) {
-                    currentFragment.setMoveAnimation(new SlideInLeftAnimator());
-                    for (int i = oldPosition; i < currentFragment.draggingPosition; i++) {
-                        currentFragment.swapCell(i, i + 1);
-                    }
-                } else {
-                    currentFragment.setMoveAnimation(new SlideInRightAnimator());
-                    for (int i = oldPosition; i > currentFragment.draggingPosition; i--) {
-                        currentFragment.swapCell(i, i - 1);
-                    }
-                }
-            } else {
-                currentFragment.draggingPosition = oldPosition;
-            }
-        }
-    }
 
     int findCellIndexInGrid(float x, float y) {
         int index;
@@ -332,29 +327,21 @@ public class MainActivity extends ActionBarActivity {
         int oldPosition = currentFragment.draggingPosition;
         currentFragment.draggingPosition = findCellIndexInGrid(event.getX(), event.getY());
         if (validHoldTime(oldPosition, currentFragment.draggingPosition)) {
-            ItemGrid holdOnItem = currentFragment.draggingItemList.get(currentFragment.draggingPosition);
-            Log.e(TAG, "" + holdOnItem.toString());
-            if (oldPosition < currentFragment.draggingPosition) {
-                currentFragment.setMoveAnimation(new SlideInLeftAnimator());
-                if (holdOnItem.id > 0) {
-                    for (int i = oldPosition; i < currentFragment.draggingPosition; i++) {
-                        currentFragment.swapCell(i, i + 1);
-                    }
-                } else {
-                    currentFragment.swapCell(oldPosition, currentFragment.draggingPosition);
-                }
-            } else {
-                currentFragment.setMoveAnimation(new SlideInRightAnimator());
-                if (holdOnItem.id > 0) {
-                    for (int i = oldPosition; i > currentFragment.draggingPosition; i--) {
-                        currentFragment.swapCell(i, i - 1);
-                    }
-                } else {
-                    currentFragment.swapCell(oldPosition, currentFragment.draggingPosition);
-                }
-            }
+            currentFragment.swapDraftCell(oldPosition, currentFragment.draggingPosition);
         } else {
             currentFragment.draggingPosition = oldPosition;
+        }
+    }
+
+    void handleMoveTab2Grid(DragEvent event) {
+        if (currentFragment.hasEmptyCell) {
+            int oldPosition = currentFragment.draggingPosition;
+            currentFragment.draggingPosition = findCellIndexInGrid(event.getX(), event.getY());
+            if (validHoldTime(oldPosition, currentFragment.draggingPosition)) {
+                currentFragment.holdOnToInsert(oldPosition);
+            } else {
+                currentFragment.draggingPosition = oldPosition;
+            }
         }
     }
 
@@ -422,9 +409,5 @@ public class MainActivity extends ActionBarActivity {
             }
             tabBarAdapter.notifyDataSetChanged();
         }
-
-
     }
-
-
 }
