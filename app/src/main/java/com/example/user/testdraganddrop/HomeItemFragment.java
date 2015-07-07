@@ -58,7 +58,7 @@ public class HomeItemFragment extends Fragment {
         int cellHeight = getArguments().getInt(KEY_CELL_HEIGHT);
         View rootView = inflater.inflate(R.layout.fragment_item_layout, container, false);
         recyclerView = (RecyclerView) rootView.findViewById(R.id.recyclerView);
-        GridLayoutManager gridLayoutManager = new GridLayoutManager(container.getContext(), 5, LinearLayoutManager.VERTICAL, false);
+        GridLayoutManager gridLayoutManager = new GridLayoutManager(container.getContext(), 6, LinearLayoutManager.VERTICAL, false);
         recyclerView.setLayoutManager(gridLayoutManager);
         gridAdapter = new GridAdapter(itemGridList, onDragItem, cellWidth, cellHeight);
         recyclerView.setAdapter(gridAdapter);

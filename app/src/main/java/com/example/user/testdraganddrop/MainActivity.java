@@ -45,10 +45,35 @@ public class MainActivity extends ActionBarActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.e(TAG, "onCreate");
         setContentView(R.layout.activity_main);
         viewPager = (ViewPager) findViewById(R.id.viewpager);
         footer = findViewById(R.id.footer);
         initBottomBar();
+        getViewPagerSize();
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        if (newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            Log.e(TAG, "ORIENTATION_LANDSCAPE");
+            change2LandScapMode();
+        } else if (newConfig.orientation == Configuration.ORIENTATION_PORTRAIT) {
+            Log.e(TAG, "ORIENTATION_PORTRAIT");
+            change2PortraitMode();
+        } else {
+            Log.e(TAG, "ORIENTATION: " + newConfig.orientation);
+        }
+    }
+
+    void change2LandScapMode() {
+        isPortrait = false;
+        getViewPagerSize();
+    }
+
+    void change2PortraitMode() {
+        isPortrait = true;
         getViewPagerSize();
     }
 
@@ -57,16 +82,13 @@ public class MainActivity extends ActionBarActivity {
             @Override
             public boolean onPreDraw() {
                 viewPager.getViewTreeObserver().removeOnPreDrawListener(this);
-                int size;
                 isPortrait = getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT;
                 if (isPortrait) {
                     gridCellWidth = ScreenHelper.getScreenWidthInPx() / 5;
                     gridCellHeight = viewPager.getHeight() / 4;
-                    size = 5 * 3;
                 } else {
-                    gridCellWidth = ScreenHelper.getScreenWidthInPx() / 6;
+                    gridCellWidth = ScreenHelper.getScreenHeightInPx() / 6;
                     gridCellHeight = viewPager.getHeight() / 2;
-                    size = 6 * 2;
                 }
                 Log.e(TAG, "gridCellWidth:" + gridCellWidth + " gridCellHeight:" + gridCellHeight);
                 adapter = new HomeViewPagerAdapter(getSupportFragmentManager(), gridCellWidth, gridCellHeight);
@@ -300,8 +322,6 @@ public class MainActivity extends ActionBarActivity {
             }
         }
         index = row * columnCount + column;
-        Log.d(TAG, "index:" + index + "row:" + row
-                + " column:" + column + " x:" + x);
         return index;
     }
 
@@ -351,7 +371,7 @@ public class MainActivity extends ActionBarActivity {
                 previousTimeOnPosition = System.currentTimeMillis();
             } else {
                 long now = System.currentTimeMillis();
-                if (now - previousTimeOnPosition > 500) {
+                if (now - previousTimeOnPosition > 300) {
                     previousTimeOnPosition = now;
                     return true;
                 }
